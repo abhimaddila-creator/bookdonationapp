@@ -1,0 +1,348 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function bookMatchesRequest(bookId) {
+      return exists(
+          /databases/$(database)/documents/books/$(bookId)
+        )
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.donorId == request.resource.data.donorId
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.title == request.resource.data.bookTitle
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.author == request.resource.data.bookAuthor
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.category == request.resource.data.bookCategory
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.condition == request.resource.data.bookCondition
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.description == request.resource.data.bookDescription
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.donorName == request.resource.data.donorName
+        && get(
+          /databases/$(database)/documents/books/$(bookId)
+        ).data.donorEmail == request.resource.data.donorEmail;
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow read, update, delete: if signedIn() && request.auth.uid == userId;
+
+      match /favorites/{favoriteId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+
+        allow create: if signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasAll([
+            'bookId',
+            'title',
+            'author',
+            'category',
+            'condition',
+            'description',
+            'donorName',
+            'donorEmail',
+            'imageUrl',
+            'isSample',
+            'savedAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'bookId',
+            'title',
+            'author',
+            'category',
+            'condition',
+            'description',
+            'donorName',
+            'donorEmail',
+            'imageUrl',
+            'isSample',
+            'savedAt'
+          ])
+          && request.resource.data.bookId is string
+          && request.resource.data.title is string
+          && request.resource.data.author is string
+          && request.resource.data.category is string
+          && request.resource.data.condition is string
+          && request.resource.data.description is string
+          && request.resource.data.donorName is string
+          && request.resource.data.donorEmail is string
+          && (
+            request.resource.data.imageUrl == null ||
+            request.resource.data.imageUrl is string
+          )
+          && request.resource.data.isSample is bool
+          && request.resource.data.savedAt == request.time;
+
+        allow update: if false;
+        allow delete: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /books/{bookId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.donorId == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.donorId == request.auth.uid;
+    }
+
+    match /book_reviews/{bookId}/reviews/{reviewerId} {
+      function approvedRequest() {
+        return exists(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        )
+        && get(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        ).data.bookId == bookId
+        && get(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        ).data.requesterId == request.auth.uid
+        && get(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        ).data.status == 'Approved';
+      }
+
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && reviewerId == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'bookId',
+          'requestId',
+          'reviewerId',
+          'reviewerEmail',
+          'reviewerName',
+          'rating',
+          'comment',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'bookId',
+          'requestId',
+          'reviewerId',
+          'reviewerEmail',
+          'reviewerName',
+          'rating',
+          'comment',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.bookId == bookId
+        && request.resource.data.requestId is string
+        && request.resource.data.reviewerId == request.auth.uid
+        && request.resource.data.reviewerEmail == request.auth.token.email
+        && request.resource.data.reviewerName is string
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && approvedRequest();
+
+      allow update: if signedIn()
+        && reviewerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'rating',
+          'comment',
+          'updatedAt'
+        ])
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /book_requests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll([
+          'bookId',
+          'bookTitle',
+          'bookAuthor',
+          'bookCategory',
+          'bookCondition',
+          'bookDescription',
+          'donorId',
+          'donorName',
+          'donorEmail',
+          'requesterId',
+          'requesterName',
+          'requesterEmail',
+          'status',
+          'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'bookId',
+          'bookTitle',
+          'bookAuthor',
+          'bookCategory',
+          'bookCondition',
+          'bookDescription',
+          'donorId',
+          'donorName',
+          'donorEmail',
+          'requesterId',
+          'requesterName',
+          'requesterEmail',
+          'status',
+          'createdAt'
+        ])
+        && request.resource.data.bookId is string
+        && request.resource.data.donorId is string
+        && request.resource.data.donorId != request.auth.uid
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.requesterName is string
+        && request.resource.data.requesterEmail is string
+        && request.resource.data.requesterEmail == request.auth.token.email
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.createdAt == request.time
+        && bookMatchesRequest(request.resource.data.bookId);
+
+      allow read: if signedIn() && (
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.donorId == request.auth.uid
+      );
+
+      allow update: if signedIn() && (
+        (
+          resource.data.requesterId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['chatRoomId'])
+          && request.resource.data.chatRoomId is string
+          && request.resource.data.chatRoomId == 'room_' + requestId
+          && exists(
+            /databases/$(database)/documents/chat_rooms/$(request.resource.data.chatRoomId)
+          )
+          && get(
+            /databases/$(database)/documents/chat_rooms/$(request.resource.data.chatRoomId)
+          ).data.requestId == requestId
+          && get(
+            /databases/$(database)/documents/chat_rooms/$(request.resource.data.chatRoomId)
+          ).data.donorId == resource.data.donorId
+          && get(
+            /databases/$(database)/documents/chat_rooms/$(request.resource.data.chatRoomId)
+          ).data.requesterId == resource.data.requesterId
+        ) || (
+          resource.data.donorId == request.auth.uid
+          && resource.data.status == 'Pending'
+          && request.resource.data.status in ['Approved', 'Rejected']
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt'])
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasAll(['status', 'updatedAt'])
+        )
+      );
+
+      allow delete: if signedIn()
+        && resource.data.requesterId == request.auth.uid
+        && resource.data.status == 'Pending';
+    }
+
+    match /notifications/{notificationId} {
+      allow read, delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['isRead'])
+        && request.resource.data.isRead == true;
+    }
+
+    match /chat_rooms/{roomId} {
+      function relatedRequest() {
+        return get(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        ).data;
+      }
+
+      allow create: if signedIn()
+        && request.resource.data.requestId is string
+        && exists(
+          /databases/$(database)/documents/book_requests/$(request.resource.data.requestId)
+        )
+        && roomId == 'room_' + request.resource.data.requestId
+        && request.resource.data.donorId == relatedRequest().donorId
+        && request.resource.data.requesterId == relatedRequest().requesterId
+        && request.resource.data.bookId == relatedRequest().bookId
+        && request.resource.data.participantIds == [
+          relatedRequest().donorId,
+          relatedRequest().requesterId
+        ]
+        && request.auth.uid in request.resource.data.participantIds;
+
+      allow read: if signedIn() && (
+        resource == null ||
+        request.auth.uid in resource.data.participantIds
+      );
+
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.participantIds
+        && request.resource.data.participantIds == resource.data.participantIds
+        && request.resource.data.donorId == resource.data.donorId
+        && request.resource.data.requesterId == resource.data.requesterId
+        && request.resource.data.requestId == resource.data.requestId
+        && request.resource.data.bookId == resource.data.bookId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bookTitle',
+          'donorName',
+          'requesterName',
+          'lastMessage',
+          'lastMessageAt',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function isRoomParticipant() {
+          return signedIn()
+            && request.auth.uid in get(
+              /databases/$(database)/documents/chat_rooms/$(roomId)
+            ).data.participantIds;
+        }
+
+        allow read: if isRoomParticipant();
+        allow create: if isRoomParticipant()
+          && request.resource.data.keys().hasAll([
+            'senderId',
+            'senderName',
+            'text',
+            'createdAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'senderId',
+            'senderName',
+            'text',
+            'createdAt'
+          ])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName is string
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 5000
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

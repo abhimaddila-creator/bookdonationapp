@@ -1,0 +1,51 @@
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "book-donation-app-e8efd",
+          "appId": "1:909641758968:android:04ecfc8e216d598885a30d",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "book-donation-app-e8efd",
+          "configurations": {
+            "android": "1:909641758968:android:04ecfc8e216d598885a30d",
+            "ios": "1:909641758968:ios:1eb4bd5af3989f6d85a30d",
+            "macos": "1:909641758968:ios:1eb4bd5af3989f6d85a30d",
+            "web": "1:909641758968:web:8564bbf17f3e029b85a30d",
+            "windows": "1:909641758968:web:2856e5373440df2e85a30d"
+          }
+        }
+      }
+    }
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
+  }
+}

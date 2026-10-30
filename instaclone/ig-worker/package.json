@@ -1,0 +1,16 @@
+{
+  "name": "instaclone-ig-worker",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "secrets": "wrangler secret bulk"
+  },
+  "devDependencies": {
+    "wrangler": "^4.11.0"
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  }
+}

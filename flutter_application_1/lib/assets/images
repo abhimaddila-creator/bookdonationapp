@@ -1,0 +1,618 @@
+wings of fire.jpg
+
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import '../services/auth_service.dart';
+
+class MyDonationsScreen extends StatefulWidget {
+  const MyDonationsScreen({super.key});
+
+  @override
+  State<MyDonationsScreen> createState() => _MyDonationsScreenState();
+}
+
+class _MyDonationsScreenState extends State<MyDonationsScreen> {
+  bool isLoading = true;
+  List<Map<String, dynamic>> donations = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadMyDonations();
+  }
+
+  // ============================================================
+  // LOAD DONATED BOOKS FROM FIREBASE
+  // ============================================================
+
+  Future<void> loadMyDonations() async {
+    final user = AuthService.currentUser;
+
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('books')
+          .where('donorEmail', isEqualTo: user.email)
+          .get();
+
+      final List<Map<String, dynamic>> loadedBooks = [];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+
+        loadedBooks.add({
+          'id': doc.id,
+          ...data,
+        });
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        donations = loadedBooks;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load donations: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // GET REQUEST FOR A BOOK
+  // ============================================================
+
+  Future<Map<String, dynamic>?> getRequestForBook(
+    String bookTitle,
+  ) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('book_requests')
+          .where('bookTitle', isEqualTo: bookTitle)
+          .where(
+            'donorEmail',
+            isEqualTo: AuthService.currentUser?.email,
+          )
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+
+      final doc = snapshot.docs.first;
+
+      return {
+        'id': doc.id,
+        ...doc.data(),
+      };
+    } catch (e) {
+      debugPrint('Request loading error: $e');
+      return null;
+    }
+  }
+
+  // ============================================================
+  // UPDATE REQUEST STATUS
+  // ============================================================
+
+  Future<void> updateRequestStatus(
+    String requestId,
+    String status,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('book_requests')
+          .doc(requestId)
+          .update({
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            status == 'Approved'
+                ? 'Request approved successfully!'
+                : 'Request rejected successfully!',
+          ),
+          backgroundColor:
+              status == 'Approved' ? Colors.green : Colors.red,
+        ),
+      );
+
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update request: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // REQUEST SECTION
+  // ============================================================
+
+  Widget _requestSection(String bookTitle) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: getRequestForBook(bookTitle),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(10),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Colors.green,
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data == null) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.grey,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'No request received for this book yet.',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final request = snapshot.data!;
+
+        final String requestId =
+            request['id']?.toString() ?? '';
+
+        final String requesterName =
+            request['requesterName']?.toString() ?? 'Unknown';
+
+        final String requesterEmail =
+            request['requesterEmail']?.toString() ?? '';
+
+        final String status =
+            request['status']?.toString() ?? 'Pending';
+
+        Color statusColor;
+        Color statusBackground;
+        IconData statusIcon;
+
+        if (status == 'Approved') {
+          statusColor = Colors.green.shade700;
+          statusBackground = Colors.green.shade100;
+          statusIcon = Icons.check_circle;
+        } else if (status == 'Rejected') {
+          statusColor = Colors.red.shade700;
+          statusBackground = Colors.red.shade100;
+          statusIcon = Icons.cancel;
+        } else {
+          statusColor = Colors.orange.shade700;
+          statusBackground = Colors.orange.shade100;
+          statusIcon = Icons.hourglass_top;
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Book Request',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Requester name
+            Row(
+              children: [
+                const Icon(
+                  Icons.person,
+                  color: Colors.deepPurple,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    requesterName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Requester email
+            Row(
+              children: [
+                const Icon(
+                  Icons.email,
+                  color: Colors.deepPurple,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    requesterEmail,
+                    style: const TextStyle(
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // Status
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: statusBackground,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    statusIcon,
+                    color: statusColor,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Status: $status',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Accept / Reject buttons
+            if (status == 'Pending') ...[
+              const SizedBox(height: 15),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        updateRequestStatus(
+                          requestId,
+                          'Approved',
+                        );
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('ACCEPT'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        updateRequestStatus(
+                          requestId,
+                          'Rejected',
+                        );
+                      },
+                      icon: const Icon(Icons.close),
+                      label: const Text('REJECT'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(BuildContext context) {
+    final user = AuthService.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('My Donations'),
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Text(
+            'Please login to view your donations.',
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+
+      appBar: AppBar(
+        title: const Text(
+          'My Donations',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: loadMyDonations,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Colors.green,
+              ),
+            )
+          : donations.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.volunteer_activism,
+                        size: 70,
+                        color: Colors.green,
+                      ),
+                      SizedBox(height: 15),
+                      Text(
+                        'No books donated yet',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Donate a book to see it here.',
+                        style: TextStyle(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: loadMyDonations,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: donations.length,
+                    itemBuilder: (context, index) {
+                      final book = donations[index];
+
+                      final String title =
+                          book['title']?.toString() ?? '';
+
+                      final String author =
+                          book['author']?.toString() ?? '';
+
+                      final String category =
+                          book['category']?.toString() ??
+                          'General';
+
+                      final String condition =
+                          book['condition']?.toString() ??
+                          'Good';
+
+                      final String description =
+                          book['description']?.toString() ??
+                          'No description provided.';
+
+                      return Card(
+                        elevation: 4,
+                        margin:
+                            const EdgeInsets.only(bottom: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              // Book heading
+                              const Text(
+                                'My Donated Book',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 18,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Book image placeholder
+                              Container(
+                                width: double.infinity,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.green.shade50,
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    12,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.menu_book,
+                                  size: 75,
+                                  color: Colors.green,
+                                ),
+                              ),
+
+                              const SizedBox(height: 15),
+
+                              // Book title
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              Text(
+                                'Author: $author',
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              Text(
+                                'Category: $category',
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              Text(
+                                'Condition: $condition',
+                              ),
+
+                              const SizedBox(height: 15),
+
+                              // Description
+                              const Text(
+                                'Description',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 5),
+
+                              Text(
+                                description,
+                                style: const TextStyle(
+                                  height: 1.4,
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
+
+                              // Donation status
+                              Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.green.shade50,
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    10,
+                                  ),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Book Donated Successfully',
+                                      style: TextStyle(
+                                        color: Colors.green,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
+
+                              // Request + Accept/Reject
+                              _requestSection(title),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+}

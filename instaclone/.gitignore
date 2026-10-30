@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment variables (never commit secrets)
+.env
+.env.local
+
+# Build output
+dist/
+build/
+
+# Firebase CLI cache
+.firebase/
+
+# Vite logs
+*.log
+npm-debug.log*
+
+# VS Code
+.vscode/
+
+# macOS / Windows junk
+.DS_Store
+Thumbs.db

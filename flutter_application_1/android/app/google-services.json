@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909641758968",
+    "project_id": "book-donation-app-e8efd",
+    "storage_bucket": "book-donation-app-e8efd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909641758968:android:04ecfc8e216d598885a30d",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgm0OWSXDbJbjlroy_WpC00sRqPKJdd8o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
